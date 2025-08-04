@@ -1,13 +1,22 @@
 #include "raylib.h"
 #include <stdio.h>
 
-const int SIDE = 50;
-const int DISC_RADIUS = SIDE / 2;
-const int MAX_DISCS = 7;
-const int SCREEN_WIDTH = SIDE * MAX_DISCS;
-const int SCREEN_HEIGHT = 800;
+#define SIDE 50
+#define DISC_RADIUS SIDE / 2
+#define MAX_DISCS 7
+#define SCREEN_WIDTH SIDE *MAX_DISCS
+#define SCREEN_HEIGHT 800
 
-int cubes[MAX_DISCS][MAX_DISCS];
+typedef struct Disc {
+    int number;
+    int state;
+} Disc;
+
+typedef struct Row {
+    Disc discs[MAX_DISCS];
+} Row;
+
+Row rows[MAX_DISCS];
 Color colors[MAX_DISCS + 1];
 
 int main(void)
@@ -26,19 +35,18 @@ int main(void)
     colors[7] = PINK;
     for (int i = 0; i < MAX_DISCS; i++) {
         for (int j = 0; j < MAX_DISCS; j++) {
-            cubes[i][j] = GetRandomValue(1, MAX_DISCS);
+            rows[i].discs[j].number = GetRandomValue(1, MAX_DISCS);
+            rows[i].discs[j].state = 0;
         }
     }
 
     while (!WindowShouldClose()) {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            printf("click at %f\n", GetTime());
+        }
         BeginDrawing();
         ClearBackground(BLACK);
         if (IsKeyPressed(KEY_P)) {
-            for (int i = 0; i < MAX_DISCS; i++) {
-                for (int j = 0; j < MAX_DISCS; j++) {
-                    printf("%d%d\n", i, j);
-                }
-            }
         }
         // ROWS
         for (int i = 0; i < MAX_DISCS; i++) {
@@ -46,7 +54,7 @@ int main(void)
             // COLUMNS
             for (int j = 0; j < MAX_DISCS; j++) {
                 int jOffset = j + 1;
-                int colorIndex = cubes[i][j];
+                int colorIndex = rows[i].discs[j].number;
                 DrawCircle(iOffset * SIDE - DISC_RADIUS, jOffset * SIDE - DISC_RADIUS, DISC_RADIUS, colors[colorIndex]);
             }
         }
