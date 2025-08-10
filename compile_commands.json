@@ -1,0 +1,25 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-c",
+      "-I/usr/local/Cellar/raylib/5.5/include/",
+      "-framework",
+      "CoreVideo",
+      "-framework",
+      "IOKit",
+      "-framework",
+      "Cocoa",
+      "-framework",
+      "GLUT",
+      "-framework",
+      "OpenGL",
+      "-o",
+      "out",
+      "src/main.c"
+    ],
+    "directory": "/Users/hopee/Documents/cprojects/rl-test",
+    "file": "/Users/hopee/Documents/cprojects/rl-test/src/main.c",
+    "output": "/Users/hopee/Documents/cprojects/rl-test/out"
+  }
+]

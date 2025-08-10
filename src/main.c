@@ -87,21 +87,21 @@ void calculateStacks()
     }
 }
 
-void calculateDisplacements()
+void swapDiscArrays(bool onlyClears)
 {
-    // reset the newDiscs array
     for (int i = 0; i < MAX_DISCS; i++) {
         for (int j = 0; j < MAX_DISCS; j++) {
-            Disc disc = cols[i].discs[j];
-            if (disc.number == 0) {
-                continue;
+            if (!onlyClears) {
+                cols[i].discs[j] = cols[i].newDiscs[j];
             }
-            cols[i].newDiscs[j].number = 0;
-            cols[i].newDiscs[j].state = INTACT;
-            cols[i].newDiscs[j].currentY = 0;
-            cols[i].newDiscs[j].targetY = 0;
+            cols[i].newDiscs[j] = (Disc){0};
         }
     }
+}
+
+void calculateDisplacements()
+{
+    swapDiscArrays(true);
     for (int i = 0; i < MAX_DISCS; i++) {
         // the bottom row doesnt have to move, so MAX_DISCS-2
         for (int j = MAX_DISCS - 1; j >= 0; j--) {
@@ -178,16 +178,6 @@ void drawDiscs()
     }
 }
 
-void swapDiscArrays()
-{
-    for (int i = 0; i < MAX_DISCS; i++) {
-        for (int j = 0; j < MAX_DISCS; j++) {
-            cols[i].discs[j] = cols[i].newDiscs[j];
-            cols[i].newDiscs[j] = (Disc){0};
-        }
-    }
-}
-
 void gravitate(float dt)
 {
     int movingDiscs = 0;
@@ -207,7 +197,7 @@ void gravitate(float dt)
     }
 
     if (movingDiscs == 0) {
-        swapDiscArrays();
+        swapDiscArrays(false);
         mode = INPUT_AWAIT;
     }
 }
