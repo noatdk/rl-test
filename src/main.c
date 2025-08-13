@@ -5,10 +5,16 @@
 #define DISC_RADIUS SIDE / 2
 #define RADIUS_MODIFIER 0.96
 #define MAX_DISCS 7
+#define MAX_DISCS_AND_NEXT_ROW 8
 #define NEXT_DISC_ROW 8
+#define ORB_PER_LVL 5
+#define ORB_SIDE SIDE / 3
+#define ORB_RADIUS ORB_SIDE / 2
 #define BACKGROUND DARKBLUE
+#define UI_BACKGROUND LIGHTGRAY
 #define SCREEN_WIDTH SIDE *MAX_DISCS
 #define SCREEN_HEIGHT (SIDE) * (MAX_DISCS + 2)
+#define REALLYDARKBLUE CLITERAL(Color){0, 29, 152, 128}
 #define max(a, b)               \
     ({                          \
         __typeof__(a) _a = (a); \
@@ -30,12 +36,13 @@ typedef struct Disc {
     int rowStack;
     float targetY;
     float currentY;
+    float initialDistance;
     float popProgress;
 } Disc;
 
 typedef struct Col {
-    Disc discs[MAX_DISCS];
-    Disc newDiscs[MAX_DISCS];
+    Disc discs[MAX_DISCS + 1];
+    Disc newDiscs[MAX_DISCS + 1];
 } Col;
 
 typedef enum {
@@ -47,7 +54,8 @@ typedef enum {
 
 typedef enum {
     INPUT_AWAIT,
-    GRAVITATING,
+    LOWERING,
+    RAISING,
     POPPING,
     BREAKING,
     GAME_OVER,
@@ -59,6 +67,7 @@ Color colors[MAX_DISCS + 1];
 Disc nextDisc;
 int mode = INPUT_AWAIT;
 int level = 1;
+int orbs = 0;
 
 bool isBusting(Disc disc)
 {
@@ -118,7 +127,7 @@ void calculateStacks()
 void swapDiscArrays(bool onlyClears)
 {
     for (int i = 0; i < MAX_DISCS; i++) {
-        for (int j = 0; j < MAX_DISCS; j++) {
+        for (int j = 0; j < MAX_DISCS_AND_NEXT_ROW; j++) {
             if (!onlyClears) {
                 cols[i].discs[j] = cols[i].newDiscs[j];
             }
@@ -143,24 +152,54 @@ void calculateDisplacements()
             }
             cols[i].discs[j].currentY = getCenter(j + 1);
             cols[i].discs[j].targetY = getCenter(nextPlacement + 1);
+            cols[i].discs[j].initialDistance = cols[i].discs[j].targetY - cols[i].discs[j].currentY;
             cols[i].newDiscs[nextPlacement] = cols[i].discs[j];
             cols[i].newDiscs[nextPlacement].currentY = cols[i].discs[j].targetY;
         }
     }
 }
 
+void raiseDiscs()
+{
+    swapDiscArrays(true);
+    for (int i = 0; i < MAX_DISCS; i++) {
+        for (int j = 0; j < MAX_DISCS_AND_NEXT_ROW; j++) {
+            Disc disc = cols[i].discs[j];
+            if (j == 0) {
+                if (disc.number != 0) {
+                    mode = GAME_OVER;
+                    return;
+                }
+                continue;
+            } else if (j == MAX_DISCS) {
+                cols[i].discs[j] = randomDisc();
+                cols[i].discs[j].state = INTACT;
+            }
+            cols[i].discs[j].currentY = getCenter(j + 1);
+            cols[i].discs[j].targetY = getCenter(j);
+            cols[i].newDiscs[j - 1] = cols[i].discs[j];
+            cols[i].newDiscs[j - 1].currentY = cols[i].discs[j].targetY;
+        }
+    }
+    mode = RAISING;
+}
+
 void collateDamage(int x, int y)
 {
     if (y != 0) {
+        // UP
         cols[x].discs[y - 1].state = min(cols[x].discs[y - 1].state + 1, BROKEN);
     }
     if (y != MAX_DISCS - 1) {
+        // DOWN
         cols[x].discs[y + 1].state = min(cols[x].discs[y + 1].state + 1, BROKEN);
     }
     if (x != 0) {
+        // LEFT
         cols[x - 1].discs[y].state = min(cols[x - 1].discs[y].state + 1, BROKEN);
     }
     if (x != MAX_DISCS - 1) {
+        // RIGHT
         cols[x + 1].discs[y].state = min(cols[x + 1].discs[y].state + 1, BROKEN);
     }
 }
@@ -178,6 +217,12 @@ void breakDiscs()
         }
     }
     if (breakingDiscs == 0) {
+        if (orbs == ORB_PER_LVL) {
+            raiseDiscs();
+            level++;
+            orbs = 0;
+            return;
+        }
         mode = INPUT_AWAIT;
     } else {
         mode = POPPING;
@@ -192,7 +237,7 @@ void updatePopProgress(float dt)
             Disc disc = cols[i].discs[j];
             if (disc.popProgress != 0) {
                 poppingDiscs++;
-                cols[i].discs[j].popProgress += 3 * dt;
+                cols[i].discs[j].popProgress += 2 * dt;
             }
             if (cols[i].discs[j].popProgress >= 0.5) {
                 poppingDiscs--;
@@ -203,7 +248,7 @@ void updatePopProgress(float dt)
     }
     if (poppingDiscs == 0) {
         calculateDisplacements();
-        mode = GRAVITATING;
+        mode = LOWERING;
     }
 }
 
@@ -231,7 +276,7 @@ void randomizeDiscs()
                 continue;
             }
             cols[i].discs[j].number = randomDiscNum();
-            cols[i].discs[j].state = GetRandomValue(INTACT, BROKEN);
+            cols[i].discs[j].state = BROKEN;
             cols[i].discs[j].currentY = getCenter(j + 1);
             cols[i].discs[j].targetY = getCenter(j + 1);
             while (isBusting(cols[i].discs[j])) {
@@ -246,7 +291,7 @@ void drawGrids()
     for (int i = 0; i < MAX_DISCS; i++) {
         DrawLineEx((Vector2){i * SIDE, 0 * SIDE}, (Vector2){i * SIDE, MAX_DISCS * SIDE}, 2, WHITE);
     }
-    for (int j = 0; j <= MAX_DISCS; j++) {
+    for (int j = 0; j < MAX_DISCS_AND_NEXT_ROW; j++) {
         DrawLineEx((Vector2){0 * SIDE, j * SIDE}, (Vector2){MAX_DISCS * SIDE, j * SIDE}, 2, WHITE);
     }
 }
@@ -257,7 +302,7 @@ void drawDiscs()
     for (int i = 0; i < MAX_DISCS; i++) {
         int iOffset = i + 1;
         // ROWS
-        for (int j = 0; j < MAX_DISCS; j++) {
+        for (int j = 0; j < MAX_DISCS_AND_NEXT_ROW; j++) {
             int jOffset = j + 1;
             Disc disc = cols[i].discs[j];
             if (disc.number == 0) {
@@ -274,34 +319,60 @@ void drawDiscs()
                 DrawCircle(getCenter(iOffset), disc.currentY, (float)DISC_RADIUS * (0.8), BLACK);
                 DrawCircle(getCenter(iOffset), disc.currentY, (float)DISC_RADIUS * (0.7), color);
             } else {
-                DrawText(TextFormat("%d", disc.number, disc.popProgress), iOffset * SIDE - DISC_RADIUS, disc.currentY, (float)DISC_RADIUS * (RADIUS_MODIFIER + disc.popProgress), WHITE);
+                DrawText(TextFormat("%d", disc.number), iOffset * SIDE - DISC_RADIUS, disc.currentY, (float)DISC_RADIUS * (RADIUS_MODIFIER + disc.popProgress), WHITE);
             }
             if (disc.state == HALF_BROKEN) {
                 DrawText(TextFormat("~", disc.number, disc.popProgress), iOffset * SIDE - DISC_RADIUS, disc.currentY, (float)DISC_RADIUS * 1, BLACK);
             }
         }
     }
-    // draw next disc
-    //
-    DrawCircle(getCenter(NEXT_DISC_ROW / 2), getCenter(NEXT_DISC_ROW + 1), (float)DISC_RADIUS * RADIUS_MODIFIER, colors[nextDisc.number]);
-    DrawText(TextFormat("%d", nextDisc.number), getCenter(NEXT_DISC_ROW / 2), getCenter(NEXT_DISC_ROW + 1), (float)DISC_RADIUS * RADIUS_MODIFIER, WHITE);
 }
 
-void gravitate(float dt)
+void drawUI()
+{
+    // DrawText(TextFormat("mode: %d", mode), 0, 0, 10, WHITE);
+    DrawRectangleV((Vector2){0, SCREEN_HEIGHT - 2 * SIDE}, (Vector2){SCREEN_WIDTH, SCREEN_HEIGHT}, UI_BACKGROUND);
+    // draw next disc
+    DrawCircle(getCenter(NEXT_DISC_ROW / 2), getCenter(NEXT_DISC_ROW + 1), (float)DISC_RADIUS * RADIUS_MODIFIER, colors[nextDisc.number]);
+    DrawText(TextFormat("%d", nextDisc.number), getCenter(NEXT_DISC_ROW / 2), getCenter(NEXT_DISC_ROW + 1), (float)DISC_RADIUS * RADIUS_MODIFIER, WHITE);
+
+    // draw orbs
+    for (int i = 0; i < ORB_PER_LVL; i++) {
+        DrawCircle((i + 1) * ORB_SIDE - ORB_RADIUS, getCenter(NEXT_DISC_ROW + 1), (float)ORB_RADIUS * 0.99, REALLYDARKBLUE);
+        if (ORB_PER_LVL - i <= orbs) {
+            DrawCircle((i + 1) * ORB_SIDE - ORB_RADIUS, getCenter(NEXT_DISC_ROW + 1), (float)ORB_RADIUS * 0.88, WHITE);
+        }
+    }
+}
+
+void gravitate(float dt, bool upwards)
 {
     int movingDiscs = 0;
     for (int i = 0; i < MAX_DISCS; i++) {
-        for (int j = 0; j < MAX_DISCS; j++) {
-            Disc disc = cols[i].discs[j];
-            if (disc.number == 0 || !(disc.targetY > disc.currentY)) {
-                continue;
+        for (int j = 0; j < MAX_DISCS_AND_NEXT_ROW; j++) {
+            if (upwards) {
+                Disc disc = cols[i].discs[j];
+                if (disc.number == 0 || !(disc.targetY < disc.currentY)) {
+                    continue;
+                }
+                movingDiscs++;
+                float newCurrentY = disc.currentY - dt * SIDE * 5;
+                if (newCurrentY <= disc.targetY) {
+                    newCurrentY = disc.targetY;
+                }
+                cols[i].discs[j].currentY = newCurrentY;
+            } else {
+                Disc disc = cols[i].discs[j];
+                if (disc.number == 0 || !(disc.targetY > disc.currentY)) {
+                    continue;
+                }
+                movingDiscs++;
+                float newCurrentY = disc.currentY + dt * disc.initialDistance + 10;
+                if (newCurrentY >= disc.targetY) {
+                    newCurrentY = disc.targetY;
+                }
+                cols[i].discs[j].currentY = newCurrentY;
             }
-            movingDiscs++;
-            float newCurrentY = disc.currentY + dt * SIDE * 10;
-            if (newCurrentY >= disc.targetY) {
-                newCurrentY = disc.targetY;
-            }
-            cols[i].discs[j].currentY = newCurrentY;
         }
     }
 
@@ -321,9 +392,10 @@ void dropNextDisc()
     }
     cols[x].discs[y] = nextDisc;
     cols[x].discs[y].currentY = getCenter(y + 1);
+    orbs++;
     nextDisc = randomDisc();
     calculateDisplacements();
-    mode = GRAVITATING;
+    mode = LOWERING;
 }
 
 int main(void)
@@ -349,14 +421,26 @@ int main(void)
         {
             float dt = GetFrameTime();
             if (IsKeyPressed(KEY_P)) {
+                int mode = INPUT_AWAIT;
+                int level = 1;
+                int orbs = 0;
+                printf("randomizing\n");
                 randomizeDiscs();
             }
+
+            // if (IsKeyPressed(KEY_K)) {
+            //     printf("raising\n");
+            //     raiseDiscs();
+            // }
+
             if (mode == INPUT_AWAIT && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
                 dropNextDisc();
             }
 
-            if (mode == GRAVITATING) {
-                gravitate(dt);
+            if (mode == LOWERING) {
+                gravitate(dt, false);
+            } else if (mode == RAISING) {
+                gravitate(dt, true);
             }
 
             if (mode == BREAKING) {
@@ -375,7 +459,7 @@ int main(void)
             ClearBackground(BACKGROUND);
             drawGrids();
             drawDiscs();
-            //  rawText(TextFormat("%d", mode), 10, 10, DISC_RADIUS, WHITE);
+            drawUI();
         }
         EndDrawing();
     }
