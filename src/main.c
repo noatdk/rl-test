@@ -1,5 +1,7 @@
 #include "raylib.h"
+#include <locale.h>
 #include <stdio.h>
+#include <threads.h>
 
 #define SIDE 100
 #define DISC_RADIUS SIDE / 2
@@ -10,6 +12,9 @@
 #define ORB_PER_LVL 5
 #define ORB_SIDE SIDE / 3
 #define ORB_RADIUS ORB_SIDE / 2
+#define LEVEL_UP_BONUS 17000
+#define LEVEL_UP_INDICATOR_TIME 2
+#define MAX_CHAIN 30
 #define BACKGROUND DARKBLUE
 #define UI_BACKGROUND LIGHTGRAY
 #define SCREEN_WIDTH SIDE *MAX_DISCS
@@ -38,6 +43,7 @@ typedef struct Disc {
     float currentY;
     float initialDistance;
     float popProgress;
+    int score;
 } Disc;
 
 typedef struct Col {
@@ -65,9 +71,15 @@ typedef enum {
 Col cols[MAX_DISCS];
 Color colors[MAX_DISCS + 1];
 Disc nextDisc;
+const int scoreMultiplierPerChain[MAX_CHAIN + 1] = {0,
+                                                    7, 39, 109, 224, 391, 617, 907, 1267, 1701, 2213, 2809, 3491, 4265, 5133, 6099, 7168, 8341, 9622, 11014, 12521, 14146, 15891, 17758, 19752, 21875, 24128, 26515, 29039, 31702, 34506};
 int mode = INPUT_AWAIT;
 int level = 1;
 int orbs = 0;
+int score = 0;
+int chain = 0;
+float lastLevelUp = 0;
+float restartTime = 0;
 
 bool isBusting(Disc disc)
 {
@@ -79,9 +91,9 @@ int randomDiscNum()
     return GetRandomValue(1, MAX_DISCS);
 }
 
-float getCenter(int nth)
+float getCenter(float nth)
 {
-    return nth * SIDE - (float)DISC_RADIUS;
+    return nth * (float)SIDE - (float)DISC_RADIUS;
 }
 
 Disc randomDisc()
@@ -182,6 +194,8 @@ void raiseDiscs()
         }
     }
     mode = RAISING;
+    score += LEVEL_UP_BONUS;
+    lastLevelUp = GetTime();
 }
 
 void collateDamage(int x, int y)
@@ -213,10 +227,12 @@ void breakDiscs()
             if (disc.number != 0 && isBusting(disc)) {
                 breakingDiscs++;
                 cols[i].discs[j].popProgress = 0.1;
+                cols[i].discs[j].score = scoreMultiplierPerChain[min(chain + 1, MAX_CHAIN)];
             }
         }
     }
     if (breakingDiscs == 0) {
+        chain = 0;
         if (orbs == ORB_PER_LVL) {
             raiseDiscs();
             level++;
@@ -225,6 +241,9 @@ void breakDiscs()
         }
         mode = INPUT_AWAIT;
     } else {
+        chain++;
+        chain = min(chain, MAX_CHAIN);
+        score += breakingDiscs * scoreMultiplierPerChain[chain];
         mode = POPPING;
     }
 }
@@ -237,7 +256,7 @@ void updatePopProgress(float dt)
             Disc disc = cols[i].discs[j];
             if (disc.popProgress != 0) {
                 poppingDiscs++;
-                cols[i].discs[j].popProgress += 2 * dt;
+                cols[i].discs[j].popProgress += 1.5 * dt;
             }
             if (cols[i].discs[j].popProgress >= 0.5) {
                 poppingDiscs--;
@@ -298,6 +317,7 @@ void drawGrids()
 
 void drawDiscs()
 {
+    Color scoreIncrementColor = colors[GetRandomValue(1, MAX_DISCS)];
     // COLUMNS
     for (int i = 0; i < MAX_DISCS; i++) {
         int iOffset = i + 1;
@@ -312,9 +332,10 @@ void drawDiscs()
             if (disc.state != BROKEN) {
                 color = WHITE;
             }
-            // 0.99 so the grids dont look weird
             DrawCircle(getCenter(iOffset), disc.currentY, (float)DISC_RADIUS * (RADIUS_MODIFIER + disc.popProgress), color);
-            // DrawText(TextFormat("x=%d:y=%d\n%d:%d:%d", iOffset, jOffset, disc.colStack, disc.rowStack, disc.number), iOffset * SIDE - DISC_RADIUS - 15, jOffset * SIDE - DISC_RADIUS - 12, 15, BLACK);
+            if (disc.score != 0) {
+                DrawText(TextFormat("+%d", disc.score), getCenter(iOffset) - 50, disc.currentY - 100, (float)DISC_RADIUS, scoreIncrementColor);
+            }
             if (disc.state != BROKEN) {
                 DrawCircle(getCenter(iOffset), disc.currentY, (float)DISC_RADIUS * (0.8), BLACK);
                 DrawCircle(getCenter(iOffset), disc.currentY, (float)DISC_RADIUS * (0.7), color);
@@ -343,7 +364,18 @@ void drawUI()
             DrawCircle((i + 1) * ORB_SIDE - ORB_RADIUS + 20, getCenter(NEXT_DISC_ROW + 1), (float)ORB_RADIUS * 0.88, WHITE);
         }
     }
-    DrawText(TextFormat("Level: %d", level), ORB_SIDE - ORB_RADIUS, getCenter(NEXT_DISC_ROW), (float)DISC_RADIUS, REALLYDARKBLUE);
+    DrawText(TextFormat("Level: %d", level), ORB_SIDE - ORB_RADIUS, getCenter(NEXT_DISC_ROW + 0.3), (float)DISC_RADIUS, REALLYDARKBLUE);
+    DrawText(TextFormat("Score: %'dpts", score), ORB_SIDE - ORB_RADIUS, getCenter(NEXT_DISC_ROW - 0.4), (float)DISC_RADIUS, REALLYDARKBLUE);
+    if (lastLevelUp != 0 && GetTime() - LEVEL_UP_INDICATOR_TIME < lastLevelUp) {
+        DrawText(TextFormat("LEVEL UP! +%d", LEVEL_UP_BONUS), getCenter(MAX_DISCS / 2 - 1), getCenter(1), (float)DISC_RADIUS, WHITE);
+    }
+    if (chain > 1) {
+        Color color = colors[GetRandomValue(1, MAX_DISCS)];
+        DrawText(TextFormat("%dx", chain), getCenter(MAX_DISCS - 1), getCenter(MAX_DISCS_AND_NEXT_ROW), (float)DISC_RADIUS * 2, color);
+    }
+    if (mode == GAME_OVER) {
+        DrawText(TextFormat("GAME OVER"), getCenter(1), getCenter(1), (float)DISC_RADIUS * 2, WHITE);
+    }
 }
 
 void gravitate(float dt, bool upwards)
@@ -401,6 +433,7 @@ void dropNextDisc()
 
 int main(void)
 {
+    setlocale(LC_NUMERIC, "");
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "DROP7");
     SetWindowPosition(0, 0);
     SetWindowFocused();
@@ -420,13 +453,22 @@ int main(void)
     while (!WindowShouldClose()) {
         // UPDATE
         {
+            if (restartTime > 0 && GetTime() - restartTime < 1) {
+                continue;
+            } else {
+                restartTime = 0;
+            }
             float dt = GetFrameTime();
-            if (IsKeyPressed(KEY_P)) {
-                int mode = INPUT_AWAIT;
-                int level = 1;
-                int orbs = 0;
-                printf("randomizing\n");
+            if (mode == GAME_OVER && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+                mode = INPUT_AWAIT;
+                level = 1;
+                orbs = 0;
+                score = 0;
+                chain = 0;
+                lastLevelUp = 0;
                 randomizeDiscs();
+                restartTime = GetTime();
+                continue;
             }
 
             // if (IsKeyPressed(KEY_K)) {
