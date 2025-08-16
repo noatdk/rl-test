@@ -338,11 +338,12 @@ void drawUI()
 
     // draw orbs
     for (int i = 0; i < ORB_PER_LVL; i++) {
-        DrawCircle((i + 1) * ORB_SIDE - ORB_RADIUS, getCenter(NEXT_DISC_ROW + 1), (float)ORB_RADIUS * 0.99, REALLYDARKBLUE);
+        DrawCircle((i + 1) * ORB_SIDE - ORB_RADIUS + 20, getCenter(NEXT_DISC_ROW + 1), (float)ORB_RADIUS * 0.99, REALLYDARKBLUE);
         if (ORB_PER_LVL - i <= orbs) {
-            DrawCircle((i + 1) * ORB_SIDE - ORB_RADIUS, getCenter(NEXT_DISC_ROW + 1), (float)ORB_RADIUS * 0.88, WHITE);
+            DrawCircle((i + 1) * ORB_SIDE - ORB_RADIUS + 20, getCenter(NEXT_DISC_ROW + 1), (float)ORB_RADIUS * 0.88, WHITE);
         }
     }
+    DrawText(TextFormat("Level: %d", level), ORB_SIDE - ORB_RADIUS, getCenter(NEXT_DISC_ROW), (float)DISC_RADIUS, REALLYDARKBLUE);
 }
 
 void gravitate(float dt, bool upwards)
