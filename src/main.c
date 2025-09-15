@@ -19,6 +19,7 @@
 #define SCREEN_WIDTH SIDE *MAX_DISCS
 #define SCREEN_HEIGHT (SIDE) * (MAX_DISCS + 2)
 #define REALLYDARKBLUE CLITERAL(Color){0, 29, 152, 128}
+
 #define max(a, b)               \
     ({                          \
         __typeof__(a) _a = (a); \
@@ -71,8 +72,38 @@ typedef enum {
 Col cols[MAX_DISCS];
 Color COLORS[MAX_DISCS + 1];
 Disc nextDisc;
-const int CHAIN_MULTIPLIER_MAP[MAX_CHAIN + 1] = {0,
-                                                 7, 39, 109, 224, 391, 617, 907, 1267, 1701, 2213, 2809, 3491, 4265, 5133, 6099, 7168, 8341, 9622, 11014, 12521, 14146, 15891, 17758, 19752, 21875, 24128, 26515, 29039, 31702, 34506};
+const int CHAIN_MULTIPLIER_MAP[MAX_CHAIN + 1] = {
+    0,
+    7,
+    39,
+    109,
+    224,
+    391,
+    617,
+    907,
+    1267,
+    1701,
+    2213,
+    2809,
+    3491,
+    4265,
+    5133,
+    6099,
+    7168,
+    8341,
+    9622,
+    11014,
+    12521,
+    14146,
+    15891,
+    17758,
+    19752,
+    21875,
+    24128,
+    26515,
+    29039,
+    31702,
+    34506};
 int mode = AWAITING_INPUT;
 int level = 1;
 int orbs = 0;
@@ -452,6 +483,7 @@ int main(void)
     SetWindowPosition(0, 0);
     SetWindowFocused();
     SetTargetFPS(60);
+
     COLORS[0] = BACKGROUND;
     COLORS[1] = LIME;
     COLORS[2] = GOLD;
