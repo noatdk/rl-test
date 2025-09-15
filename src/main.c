@@ -111,6 +111,11 @@ int score = 0;
 int chain = 0;
 float lastLevelUp = 0;
 float restartTime = 0;
+Rectangle restartButton = {
+    SCREEN_WIDTH - DISC_RADIUS * 1.5,
+    SCREEN_HEIGHT - DISC_RADIUS * 1.5,
+    DISC_RADIUS,
+    DISC_RADIUS};
 
 bool isBusting(Disc disc)
 {
@@ -395,6 +400,8 @@ void drawUI()
     // UI BACKGROUND
     DrawRectangleV((Vector2){0, SCREEN_HEIGHT - 2 * SIDE}, (Vector2){SCREEN_WIDTH, SCREEN_HEIGHT}, UI_BACKGROUND);
 
+    DrawRectangleRec(restartButton, RED);
+
     // draw next disc
     DrawCircle(nextDiscCenter, nextDiscY, DISC_RADIUS * RADIUS_MODIFIER, COLORS[nextDisc.number]);
     DrawText(TextFormat("%d", nextDisc.number), nextDiscCenter, nextDiscY, DISC_RADIUS * RADIUS_MODIFIER, WHITE);
@@ -460,9 +467,27 @@ void gravitate(float dt, bool upwards)
     }
 }
 
+void restart()
+{
+    mode = PRE_GAME;
+    level = 1;
+    orbs = 0;
+    score = 0;
+    chain = 0;
+    lastLevelUp = 0;
+    randomizeDiscs();
+    restartTime = GetTime();
+}
+
 void dropNextDisc()
 {
     Vector2 mousePos = GetMousePosition();
+    if (CheckCollisionPointRec(mousePos, restartButton)) {
+        restart();
+        mode = AWAITING_INPUT;
+        restartTime = GetTime() - RESTART_TIME;
+        return;
+    }
     int x = mousePos.x / SIDE;
     int y = 0;
     if (cols[x].discs[y].number != 0) {
@@ -506,14 +531,7 @@ int main(void)
             }
             float dt = GetFrameTime();
             if (mode == GAME_OVER && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-                mode = PRE_GAME;
-                level = 1;
-                orbs = 0;
-                score = 0;
-                chain = 0;
-                lastLevelUp = 0;
-                randomizeDiscs();
-                restartTime = GetTime();
+                restart();
                 continue;
             }
 
